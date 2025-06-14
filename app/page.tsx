@@ -17,10 +17,10 @@ export default function HomePage() {
               <Link href="/auth/login?role=student">Student Login</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="text-lg px-8">
-              <Link href="/auth/login?role=teacher">Teacher Login</Link>
+              <Link href="/auth/role-login">Teacher Login</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="text-lg px-8">
-              <Link href="/auth/login?role=admin">Admin Login</Link>
+              <Link href="/auth/role-login">Admin Login</Link>
             </Button>
           </div>
         </div>

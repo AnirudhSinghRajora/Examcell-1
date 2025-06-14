@@ -116,8 +116,8 @@ export default function ContactPage() {
 
   const quickLinks = [
     { title: "Student Login", href: "/auth/login?role=student", icon: User },
-    { title: "Teacher Login", href: "/auth/login?role=teacher", icon: Building },
-    { title: "Admin Login", href: "/auth/login?role=admin", icon: Building },
+    { title: "Teacher Login", href: "/auth/role-login", icon: Building },
+    { title: "Admin Login", href: "/auth/role-login", icon: Building },
     { title: "Submit Query", href: "/student/queries", icon: MessageSquare },
   ]
 
