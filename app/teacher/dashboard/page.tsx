@@ -1,41 +1,51 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, MessageSquare, BookOpen, Upload, TrendingUp, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { teacherApiClient, type TeacherDashboard } from "@/lib/teacher-api"
+import { useAuth } from "@/context/AuthContext"
 
 export default function TeacherDashboardPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<TeacherDashboard | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "TEACHER")) {
+      router.push("/auth/login?role=teacher");
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setLoading(true)
+        setDataLoading(true)
         const user = JSON.parse(localStorage.getItem("user") || "{}")
-        const teacherId = user.teacherId
+        const teacherId = user.teacherId;
 
         if (!teacherId) {
           throw new Error("Teacher ID not found")
         }
-
+        console.log("Fetching dashboard for teacher ID:", teacherId)
         const data = await teacherApiClient.getTeacherDashboard(teacherId)
         setDashboardData(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard")
       } finally {
-        setLoading(false)
+        setDataLoading(false)
       }
     }
 
     fetchDashboardData()
   }, [])
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="space-y-6">
         <div>
