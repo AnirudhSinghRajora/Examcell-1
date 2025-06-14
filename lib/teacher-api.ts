@@ -4,9 +4,12 @@ class TeacherApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`
 
+    // Retrieve token from localStorage or another secure place
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : undefined
     const config: RequestInit = {
       headers: {
         "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,
