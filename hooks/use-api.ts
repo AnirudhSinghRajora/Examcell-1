@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 
-export function useApi<T>(apiCall: () => Promise<T>, dependencies: any[] = []) {
+export function useApi<T>(apiCall: (token: string | null) => Promise<T>, dependencies: any[] = []) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -14,7 +14,8 @@ export function useApi<T>(apiCall: () => Promise<T>, dependencies: any[] = []) {
       try {
         setLoading(true)
         setError(null)
-        const result = await apiCall()
+        const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+        const result = await apiCall(token);
         if (isMounted) {
           setData(result)
         }
@@ -40,7 +41,8 @@ export function useApi<T>(apiCall: () => Promise<T>, dependencies: any[] = []) {
     try {
       setLoading(true)
       setError(null)
-      const result = await apiCall()
+      const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+      const result = await apiCall(token);
       setData(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")

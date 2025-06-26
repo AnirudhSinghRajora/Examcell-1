@@ -33,7 +33,7 @@ export default function BonafidePage() {
   const requests = requestsData?.content || []
   const totalElements = requestsData?.totalElements || 0
 
-  const handleApprove = async (requestId: number) => {
+  const handleApprove = async (requestId: string) => {
     setIsProcessing(true)
     try {
       await apiClient.approveBonafideRequest(requestId, "Admin")
@@ -51,7 +51,7 @@ export default function BonafidePage() {
     }
   }
 
-  const handleReject = async (requestId: number) => {
+  const handleReject = async (requestId: string) => {
     if (confirm("Are you sure you want to reject this request?")) {
       setIsProcessing(true)
       try {
@@ -71,7 +71,7 @@ export default function BonafidePage() {
     }
   }
 
-  const handleGenerateCertificate = (requestId: number) => {
+  const handleGenerateCertificate = (requestId: string) => {
     alert(`Generating bonafide certificate for request ${requestId}...`)
   }
 
@@ -216,17 +216,17 @@ export default function BonafidePage() {
                     {request.purpose === "Other" ? request.customPurpose : request.purpose}
                   </CardTitle>
                   <CardDescription>
-                    {request.studentName} ({request.studentRollNo}) • {request.studentSemester} Semester
+                    {request.studentName || 'N/A'} ({request.studentRollNo || 'N/A'}) • {request.studentSemester ? `${request.studentSemester} Semester` : 'N/A'}
                   </CardDescription>
                   <p className="text-sm text-gray-500 mt-1">
-                    Submitted: {new Date(request.createdAt).toLocaleDateString()}
+                    Submitted: {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
                 <Badge className={getStatusColor(request.status)}>{request.status}</Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-700 mb-4">{request.additionalInfo}</p>
+              <p className="text-gray-700 mb-4">{request.additionalInfo || 'No additional information provided.'}</p>
 
               <div className="flex flex-col sm:flex-row gap-2">
                 <Dialog>
@@ -239,7 +239,7 @@ export default function BonafidePage() {
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>Bonafide Certificate Request</DialogTitle>
-                      <DialogDescription>Request details from {selectedRequest?.studentName}</DialogDescription>
+                      <DialogDescription>Request details from {selectedRequest?.studentName || 'N/A'}</DialogDescription>
                     </DialogHeader>
 
                     {selectedRequest && (
@@ -250,16 +250,16 @@ export default function BonafidePage() {
                             <h4 className="font-medium mb-2">Student Information</h4>
                             <div className="space-y-1 text-sm">
                               <p>
-                                <strong>Name:</strong> {selectedRequest.studentName}
+                                <strong>Name:</strong> {selectedRequest.studentName || 'N/A'}
                               </p>
                               <p>
-                                <strong>Roll No:</strong> {selectedRequest.studentRollNo}
+                                <strong>Roll No:</strong> {selectedRequest.studentRollNo || 'N/A'}
                               </p>
                               <p>
-                                <strong>Email:</strong> {selectedRequest.studentEmail}
+                                <strong>Email:</strong> {selectedRequest.studentEmail || 'N/A'}
                               </p>
                               <p>
-                                <strong>Semester:</strong> {selectedRequest.studentSemester}
+                                <strong>Semester:</strong> {selectedRequest.studentSemester ? `${selectedRequest.studentSemester} Semester` : 'N/A'}
                               </p>
                             </div>
                           </div>
@@ -269,16 +269,16 @@ export default function BonafidePage() {
                               <p>
                                 <strong>Purpose:</strong>{" "}
                                 {selectedRequest.purpose === "Other"
-                                  ? selectedRequest.customPurpose
-                                  : selectedRequest.purpose}
+                                  ? selectedRequest.customPurpose || 'N/A'
+                                  : selectedRequest.purpose || 'N/A'}
                               </p>
                               <p>
-                                <strong>Submitted:</strong> {new Date(selectedRequest.createdAt).toLocaleDateString()}
+                                <strong>Submitted:</strong> {selectedRequest.createdAt ? new Date(selectedRequest.createdAt).toLocaleDateString() : 'N/A'}
                               </p>
                               <p>
                                 <strong>Status:</strong>
-                                <Badge className={`ml-2 ${getStatusColor(selectedRequest.status)}`}>
-                                  {selectedRequest.status}
+                                <Badge className={`ml-2 ${getStatusColor(selectedRequest.status || '')}`}>
+                                  {selectedRequest.status || 'N/A'}
                                 </Badge>
                               </p>
                             </div>
@@ -289,7 +289,7 @@ export default function BonafidePage() {
                         <div>
                           <h4 className="font-medium mb-2">Additional Information</h4>
                           <div className="p-4 bg-gray-50 rounded-lg">
-                            <p className="text-gray-700">{selectedRequest.additionalInfo}</p>
+                            <p className="text-gray-700">{selectedRequest.additionalInfo || 'No additional information provided.'}</p>
                           </div>
                         </div>
 
@@ -299,7 +299,7 @@ export default function BonafidePage() {
                             <h4 className="font-medium mb-2">Approval Information</h4>
                             <div className="space-y-1 text-sm">
                               <p>
-                                <strong>Status:</strong> {selectedRequest.status}
+                                <strong>Status:</strong> {selectedRequest.status || 'N/A'}
                               </p>
                               <p>
                                 <strong>Date:</strong>{" "}
@@ -397,18 +397,31 @@ export default function BonafidePage() {
             <p className="text-gray-500">
               {filters.search || filters.status
                 ? "No requests match your current filters."
-                : "No bonafide certificate requests have been submitted yet."}
+                : "All bonafide certificate requests will appear here."
+              }
             </p>
           </CardContent>
         </Card>
       )}
 
       {/* Pagination */}
-      {totalElements > 0 && (
-        <div className="flex justify-center">
-          <p className="text-sm text-gray-600">
-            Showing {requests.length} of {totalElements} requests
-          </p>
+      {requestsData && requestsData.totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <Button
+            variant="outline"
+            onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(0, prev.page - 1) }))}
+            disabled={requestsData.first}
+            className="mr-2"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setFilters((prev) => ({ ...prev, page: Math.min(requestsData.totalPages - 1, prev.page + 1) }))}
+            disabled={requestsData.last}
+          >
+            Next
+          </Button>
         </div>
       )}
     </div>

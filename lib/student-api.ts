@@ -13,6 +13,7 @@ class StudentApiClient {
 
     // 1. Get the authentication token from localStorage.
     const token = localStorage.getItem("authToken");
+    console.log("API Request Debug:", { url, token: token ? "Token exists" : "No token" });
 
     // 2. Prepare the default headers.
     const defaultHeaders: HeadersInit = {
@@ -34,9 +35,12 @@ class StudentApiClient {
     };
     // --- MODIFICATION END ---
 
+    console.log("Request config:", { url, headers: config.headers });
 
     try {
       const response = await fetch(url, config); // Use the new config with headers
+
+      console.log("Response status:", response.status, response.statusText);
 
       // Handle 401 Unauthorized specifically - might mean the token expired.
       if (response.status === 401) {
@@ -47,13 +51,16 @@ class StudentApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error("Response error data:", errorData);
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
       
       // Handle responses that might not have a JSON body (e.g., a 204 No Content response)
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
-        return await response.json();
+        const data = await response.json();
+        console.log("Response data:", data);
+        return data;
       } else {
         // Return a resolved promise for non-JSON responses to avoid parsing errors.
         return Promise.resolve() as Promise<T>;
@@ -69,52 +76,52 @@ class StudentApiClient {
   // All the methods below will now automatically use the modified `request` method
   // and send the Authorization header with every call.
 
-  // Student Dashboard
-  async getStudentDashboard(studentId: number) {
-    return this.request<StudentDashboard>(`/student/dashboard/${studentId}`);
+  // Student Dashboard - Updated endpoint and parameter type
+  async getStudentDashboard(studentId: string) {
+    return this.request<StudentDashboard>(`/student/${studentId}/dashboard`);
   }
 
-  // Student Results
-  async getStudentResults(studentId: number) {
+  // Student Results - Updated parameter type
+  async getStudentResults(studentId: string) {
     return this.request<StudentResult[]>(`/student/${studentId}/results`);
   }
 
-  // Student Queries
-  async getStudentQueries(studentId: number, page = 0, size = 10) {
+  // Student Queries - Updated parameter type
+  async getStudentQueries(studentId: string, page = 0, size = 10) {
     return this.request<PagedResponse<StudentQuery>>(`/student/${studentId}/queries?page=${page}&size=${size}`);
   }
 
-  async submitQuery(studentId: number, query: SubmitQueryRequest) {
+  async submitQuery(studentId: string, query: SubmitQueryRequest) {
     return this.request<StudentQuery>(`/student/${studentId}/queries`, {
       method: "POST",
       body: JSON.stringify(query),
     });
   }
 
-  // Bonafide Requests
-  async getBonafideRequests(studentId: number, page = 0, size = 10) {
+  // Bonafide Requests - Updated parameter type
+  async getBonafideRequests(studentId: string, page = 0, size = 10) {
     return this.request<PagedResponse<BonafideRequest>>(
       `/student/${studentId}/bonafide-requests?page=${page}&size=${size}`,
     );
   }
 
-  async submitBonafideRequest(studentId: number, request: SubmitBonafideRequest) {
+  async submitBonafideRequest(studentId: string, request: SubmitBonafideRequest) {
     return this.request<BonafideRequest>(`/student/${studentId}/bonafide-requests`, {
       method: "POST",
       body: JSON.stringify(request),
     });
   }
 
-  // Subjects
-  async getSubjects() {
-    return this.request<StudentSubject[]>("/student/subjects");
+  // Subjects - Updated endpoint
+  async getSubjects(studentId: string) {
+    return this.request<StudentSubject[]>(`/student/${studentId}/subjects`);
   }
 }
 
 // --- Types (No Changes Needed) ---
 export interface StudentDashboard {
   student: {
-    id: number;
+    id: string; // Changed to string to match backend UUID
     rollNo: string;
     name: string;
     email: string;
@@ -131,52 +138,52 @@ export interface StudentDashboard {
 }
 
 export interface StudentResult {
-  id: number;
-  subjectName: string;
-  subjectCode: string;
-  marks: number;
+  subject: {
+    id: string;
+    name: string;
+    code: string;
+    description: string;
+    semester: number;
+    credits: number;
+    courseName: string;
+    branchNames: string[];
+  };
+  marksObtained: number;
+  maxMarks: number;
+  semester: number;
+  gradePoint: number;
   grade: string;
-  examType: string;
-  academicYear: string;
-  createdAt: string;
 }
 
 export interface StudentQuery {
-  id: number;
+  id: string; // Changed to string to match backend UUID
+  studentId: string;
+  studentName: string;
+  teacherId?: string;
+  teacherName?: string;
   subject: string;
-  faculty: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
+  queryText: string;
   response?: string;
-  respondedBy?: string;
-  respondedAt?: string;
+  status: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface SubmitQueryRequest {
   subject: string;
-  faculty: string;
-  title: string;
-  description: string;
-  priority?: string;
+  queryText: string;
 }
 
 export interface BonafideRequest {
-  id: number;
-  purpose: string;
-  customPurpose?: string;
-  additionalInfo?: string;
+  id: string; // Changed to string to match backend UUID
+  studentId: string;
+  studentName: string;
+  studentRollNumber: string;
+  reason: string;
   status: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  certificateNumber?: string;
-  certificatePath?: string;
-  createdAt: string;
-  updatedAt: string;
+  requestedAt: string;
+  processedAt?: string;
+  processedByAdminId?: string;
+  processedByAdminName?: string;
 }
 
 export interface SubmitBonafideRequest {
@@ -186,13 +193,14 @@ export interface SubmitBonafideRequest {
 }
 
 export interface StudentSubject {
-  id: number;
-  code: string;
+  id: string; // Changed to string to match backend UUID
   name: string;
-  semester: string;
-  department: string;
+  code: string;
+  description: string;
+  semester: number;
   credits: number;
-  faculty: string;
+  courseName: string;
+  branchNames: string[];
 }
 
 export interface PagedResponse<T> {

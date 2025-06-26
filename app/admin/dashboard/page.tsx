@@ -4,11 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Users, FileText, MessageSquare, TrendingUp, AlertCircle } from "lucide-react"
 import { useApi } from "@/hooks/use-api"
 import { apiClient, type DashboardStats } from "@/lib/api"
+import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
-  const { data: stats, loading, error } = useApi<DashboardStats>(() => apiClient.getDashboardStats())
+  const [isClient, setIsClient] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const { data: stats, loading, error } = useApi<DashboardStats>(
+    () => (isClient ? apiClient.getDashboardStats() : Promise.resolve({} as DashboardStats)),
+    [isClient]
+  );
+
+  if (!isClient || loading) {
     return (
       <div className="space-y-6">
         <div>
@@ -52,19 +62,19 @@ export default function AdminDashboard() {
     },
     {
       title: "Pending Queries",
-      value: stats?.pendingQueries?.toString() || "0",
+      value: stats?.totalQueriesOpen?.toString() || "0",
       icon: MessageSquare,
       change: "-5%",
     },
     {
       title: "Bonafide Requests",
-      value: stats?.bonafideRequests?.toString() || "0",
+      value: stats?.totalBonafideRequestsPending?.toString() || "0",
       icon: FileText,
       change: "+3%",
     },
     {
-      title: "Results Published",
-      value: stats?.resultsPublished?.toString() || "0",
+      title: "Total Subjects",
+      value: stats?.totalSubjects?.toString() || "0",
       icon: TrendingUp,
       change: "+18%",
     },
@@ -78,8 +88,8 @@ export default function AdminDashboard() {
   ]
 
   const pendingTasks = [
-    { task: "Review bonafide requests", count: stats?.bonafideRequests || 0, priority: "high" },
-    { task: "Respond to student queries", count: stats?.pendingQueries || 0, priority: "medium" },
+    { task: "Review bonafide requests", count: stats?.totalBonafideRequestsPending || 0, priority: "high" },
+    { task: "Respond to student queries", count: stats?.totalQueriesOpen || 0, priority: "medium" },
     { task: "Upload semester results", count: 3, priority: "high" },
     { task: "Generate academic reports", count: 2, priority: "low" },
   ]

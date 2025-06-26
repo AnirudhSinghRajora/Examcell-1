@@ -81,8 +81,9 @@ export interface SignupRequest {
   username: string;
   email: string;
   password: string;
-  fullName: string;
-  role: "STUDENT" | "TEACHER" | "ADMIN";
+  firstName: string;
+  lastName: string;
+  role: "STUDENT" | "PROFESSOR" | "ADMIN";
   // Optional Student fields
   rollNo?: string;
   semester?: string;
@@ -100,7 +101,7 @@ export interface SignupRequest {
  * Matches AuthRequest.java DTO.
  */
 export interface LoginRequest {
-  usernameOrEmail: string;
+  email: string;
   password: string;
 }
 
@@ -110,13 +111,11 @@ export interface LoginRequest {
  */
 export interface AuthResponse {
   token: string;
-  role: "STUDENT" | "TEACHER" | "ADMIN";
-  userId: number;
-  studentId?: number;
-  teacherId?: number;
-  fullName: string;
+  role: "STUDENT" | "PROFESSOR" | "ADMIN";
+  id: string; // UUID from backend
+  firstName: string;
+  lastName: string;
   email: string;
-  message: string;
 }
 
 // Create and export a single, reusable instance of the client.

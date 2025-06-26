@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [role, setRole] = useState<"STUDENT" | "TEACHER" | "ADMIN">("STUDENT");
+  const [role, setRole] = useState<"STUDENT" | "PROFESSOR" | "ADMIN">("STUDENT");
   const [form, setForm] = useState({
     username: "",
     email: "",
     password: "",
-    fullName: "",
-    role: "STUDENT" as "STUDENT" | "TEACHER" | "ADMIN",
+    firstName: "",
+    lastName: "",
+    role: "STUDENT" as "STUDENT" | "PROFESSOR" | "ADMIN",
     rollNo: "",
     semester: "",
     department: "",
@@ -35,7 +36,7 @@ export default function SignupPage() {
   };
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRole = e.target.value as "STUDENT" | "TEACHER" | "ADMIN";
+    const newRole = e.target.value as "STUDENT" | "PROFESSOR" | "ADMIN";
     setRole(newRole);
     setForm((prev) => ({ ...prev, role: newRole }));
   };
@@ -48,7 +49,7 @@ export default function SignupPage() {
       const res = await authApiClient.signup(form);
       login(res);
       if (role === "STUDENT") router.push("/student/dashboard");
-      else if (role === "TEACHER") router.push("/teacher/dashboard");
+      else if (role === "PROFESSOR") router.push("/teacher/dashboard");
       else if (role === "ADMIN") router.push("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "Signup failed");
@@ -63,11 +64,12 @@ export default function SignupPage() {
         <h1 className="text-2xl font-bold text-center mb-4">Signup</h1>
         <select name="role" value={role} onChange={handleRoleChange} className="w-full border rounded px-3 py-2 mb-2">
           <option value="STUDENT">Student</option>
-          <option value="TEACHER">Teacher</option>
+          <option value="PROFESSOR">Teacher</option>
           <option value="ADMIN">Admin</option>
         </select>
         {error && <div className="text-red-600 text-sm text-center">{error}</div>}
-        <Input name="fullName" placeholder="Full Name" value={form.fullName} onChange={handleChange} required />
+        <Input name="firstName" placeholder="First Name" value={form.firstName} onChange={handleChange} required />
+        <Input name="lastName" placeholder="Last Name" value={form.lastName} onChange={handleChange} required />
         <Input name="username" placeholder="Username" value={form.username} onChange={handleChange} required />
         <Input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} required />
         <Input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} required />
@@ -80,7 +82,7 @@ export default function SignupPage() {
             <Input name="address" placeholder="Address" value={form.address} onChange={handleChange} />
           </>
         )}
-        {role === "TEACHER" && (
+        {role === "PROFESSOR" && (
           <>
             <Input name="employeeId" placeholder="Employee ID" value={form.employeeId} onChange={handleChange} required />
             <Input name="designation" placeholder="Designation" value={form.designation} onChange={handleChange} required />

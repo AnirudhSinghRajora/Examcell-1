@@ -20,6 +20,7 @@ import {
 import { Upload, Download, FileSpreadsheet, Plus, Edit, Trash2 } from "lucide-react"
 import { apiClient, type Mark, type MarkFilters, type CreateMarkRequest } from "@/lib/api"
 import { useApi } from "@/hooks/use-api"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 
 export default function MarksPage() {
   const [filters, setFilters] = useState<MarkFilters>({ page: 0, size: 10 })
@@ -29,9 +30,11 @@ export default function MarksPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [editingMark, setEditingMark] = useState<Mark | null>(null)
   const [newMark, setNewMark] = useState<CreateMarkRequest>({
-    studentId: 0,
-    subjectId: 0,
-    marks: 0,
+    studentId: "",
+    subjectId: "",
+    internal1: 0,
+    internal2: 0,
+    external: 0,
     examType: "FINAL",
     uploadedBy: "Admin",
   })
@@ -44,10 +47,12 @@ export default function MarksPage() {
     refetch: refetchMarks,
   } = useApi(() => apiClient.getMarks(filters), [filters])
 
-  const { data: subjects, loading: subjectsLoading } = useApi(() => apiClient.getSubjects(), [])
+  const { data: subjectsData, loading: subjectsLoading } = useApi(() => apiClient.getSubjects(), [])
 
+  const subjects = subjectsData?.content || []
   const marks = marksData?.content || []
   const totalElements = marksData?.totalElements || 0
+  const totalPages = Math.ceil(totalElements / filters.size)
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,7 +101,9 @@ export default function MarksPage() {
 
     try {
       await apiClient.updateMark(editingMark.id, {
-        marks: editingMark.marks,
+        internal1: editingMark.internal1,
+        internal2: editingMark.internal2,
+        external: editingMark.external,
         examType: editingMark.examType,
         uploadedBy: "Admin",
       })
@@ -109,7 +116,7 @@ export default function MarksPage() {
     }
   }
 
-  const handleDeleteMark = async (id: number) => {
+  const handleDeleteMark = async (id: string) => {
     if (confirm("Are you sure you want to delete this mark?")) {
       try {
         await apiClient.deleteMark(id)
@@ -128,9 +135,11 @@ export default function MarksPage() {
       alert("Mark added successfully!")
       setShowAddDialog(false)
       setNewMark({
-        studentId: 0,
-        subjectId: 0,
-        marks: 0,
+        studentId: "",
+        subjectId: "",
+        internal1: 0,
+        internal2: 0,
+        external: 0,
         examType: "FINAL",
         uploadedBy: "Admin",
       })
@@ -151,6 +160,10 @@ export default function MarksPage() {
       subjectCode: subjectCode === "all" ? undefined : subjectCode,
       page: 0,
     }))
+  }
+
+  const handlePageChange = (page: number) => {
+    setFilters((prev) => ({ ...prev, page }))
   }
 
   if (marksLoading || subjectsLoading) {
@@ -220,7 +233,7 @@ export default function MarksPage() {
                     <SelectValue placeholder="Select subject" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects?.map((subject) => (
+                    {subjects.map((subject) => (
                       <SelectItem key={subject.id} value={subject.id.toString()}>
                         {subject.name} ({subject.code})
                       </SelectItem>
@@ -298,7 +311,7 @@ export default function MarksPage() {
                         <SelectValue placeholder="Select subject" />
                       </SelectTrigger>
                       <SelectContent>
-                        {subjects?.map((subject) => (
+                        {subjects.map((subject) => (
                           <SelectItem key={subject.id} value={subject.id.toString()}>
                             {subject.name}
                           </SelectItem>
@@ -307,14 +320,33 @@ export default function MarksPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Marks</Label>
+                    <Label>Internal 1 Marks</Label>
                     <Input
                       type="number"
                       min="0"
                       max="100"
-                      placeholder="Enter marks"
-                      value={newMark.marks || ""}
-                      onChange={(e) => setNewMark((prev) => ({ ...prev, marks: Number.parseInt(e.target.value) || 0 }))}
+                      value={newMark.internal1 || ""}
+                      onChange={(e) => setNewMark((prev) => ({ ...prev, internal1: Number.parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Internal 2 Marks</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newMark.internal2 || ""}
+                      onChange={(e) => setNewMark((prev) => ({ ...prev, internal2: Number.parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>External Marks</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newMark.external || ""}
+                      onChange={(e) => setNewMark((prev) => ({ ...prev, external: Number.parseInt(e.target.value) || 0 }))}
                     />
                   </div>
                   <Button className="w-full" onClick={handleAddMark}>
@@ -341,7 +373,7 @@ export default function MarksPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Subjects</SelectItem>
-                {subjects?.map((subject) => (
+                {subjects.map((subject) => (
                   <SelectItem key={subject.id} value={subject.code}>
                     {subject.name}
                   </SelectItem>
@@ -370,7 +402,7 @@ export default function MarksPage() {
                     <td className="py-3">{mark.subjectName}</td>
                     <td className="py-3 text-center font-semibold">{mark.marks}</td>
                     <td className="py-3 text-center">
-                      <Badge variant={mark.grade.includes("A") ? "default" : "secondary"}>{mark.grade}</Badge>
+                      <Badge variant={(mark.grade || "").includes("A") ? "default" : "secondary"}>{(mark.grade || "")}</Badge>
                     </td>
                     <td className="py-3 text-center">
                       <div className="flex justify-center gap-2">
@@ -414,14 +446,38 @@ export default function MarksPage() {
                 <Input value={editingMark.subjectName} disabled />
               </div>
               <div className="space-y-2">
-                <Label>Marks</Label>
+                <Label>Internal 1 Marks</Label>
                 <Input
                   type="number"
                   min="0"
                   max="100"
-                  value={editingMark.marks}
+                  value={editingMark.internal1 || ""}
                   onChange={(e) =>
-                    setEditingMark((prev) => (prev ? { ...prev, marks: Number.parseInt(e.target.value) || 0 } : null))
+                    setEditingMark((prev) => (prev ? { ...prev, internal1: Number.parseInt(e.target.value) || 0 } : null))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Internal 2 Marks</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editingMark.internal2 || ""}
+                  onChange={(e) =>
+                    setEditingMark((prev) => (prev ? { ...prev, internal2: Number.parseInt(e.target.value) || 0 } : null))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>External Marks</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editingMark.external || ""}
+                  onChange={(e) =>
+                    setEditingMark((prev) => (prev ? { ...prev, external: Number.parseInt(e.target.value) || 0 } : null))
                   }
                 />
               </div>
@@ -439,6 +495,37 @@ export default function MarksPage() {
           <p className="text-sm text-gray-600">
             Showing {marks.length} of {totalElements} marks
           </p>
+          {totalPages > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={() => handlePageChange(filters.page - 1)}
+                    isActive={filters.page > 0}
+                  />
+                </PaginationItem>
+                {[...Array(totalPages)].map((_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      href="#"
+                      isActive={filters.page === i}
+                      onClick={() => handlePageChange(i)}
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={() => handlePageChange(filters.page + 1)}
+                    isActive={filters.page < totalPages - 1}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       )}
 

@@ -2,36 +2,46 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/a
 
 class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const url = `${API_BASE_URL}${endpoint}`
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
 
-  const config: RequestInit = {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
-  }
+    console.log("Frontend: Token from localStorage in apiClient.request:", token ? "[TOKEN_PRESENT]" : "[TOKEN_NULL_OR_UNDEFINED]");
 
-  try {
-    const response = await fetch(url, config)
+    console.log("API Request URL:", url)
+    console.log("API Base URL:", API_BASE_URL)
+    console.log("Endpoint:", endpoint)
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+    const config: RequestInit = {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+      ...options,
     }
 
-    return await response.json()
-  } catch (error) {
-    console.error("API request failed:", error)
-    throw error
+    try {
+      const response = await fetch(url, config)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("API request failed:", error)
+      throw error
+    }
   }
-}
+
+  async getCourses() {
+    return this.request<{ name: string; totalSemesters: number }[]>("/courses");
+  }
 
   // Dashboard API
   async getDashboardStats() {
-    return this.request<DashboardStats>("/dashboard/stats")
+    return this.request<DashboardStats>("/dashboard/statistics")
   }
 
   // Students API
@@ -39,14 +49,15 @@ class ApiClient {
     const searchParams = new URLSearchParams()
     if (params.search) searchParams.append("search", params.search)
     if (params.semester) searchParams.append("semester", params.semester)
-    if (params.department) searchParams.append("department", params.department)
+    if (params.course) searchParams.append("course", params.course)
+    if (params.branch) searchParams.append("branch", params.branch)
     if (params.page !== undefined) searchParams.append("page", params.page.toString())
     if (params.size !== undefined) searchParams.append("size", params.size.toString())
 
     return this.request<PagedResponse<Student>>(`/students?${searchParams}`)
   }
 
-  async getStudent(id: number) {
+  async getStudent(id: string) {
     return this.request<Student>(`/students/${id}`)
   }
 
@@ -57,14 +68,14 @@ class ApiClient {
     })
   }
 
-  async updateStudent(id: number, student: UpdateStudentRequest) {
+  async updateStudent(id: string, student: UpdateStudentRequest) {
     return this.request<Student>(`/students/${id}`, {
       method: "PUT",
       body: JSON.stringify(student),
     })
   }
 
-  async deleteStudent(id: number) {
+  async deleteStudent(id: string) {
     return this.request<void>(`/students/${id}`, {
       method: "DELETE",
     })
@@ -89,27 +100,27 @@ class ApiClient {
     })
   }
 
-  async updateMark(id: number, mark: UpdateMarkRequest) {
+  async updateMark(id: string, mark: UpdateMarkRequest) {
     return this.request<Mark>(`/marks/${id}`, {
       method: "PUT",
       body: JSON.stringify(mark),
     })
   }
 
-  async deleteMark(id: number) {
+  async deleteMark(id: string) {
     return this.request<void>(`/marks/${id}`, {
       method: "DELETE",
     })
   }
 
-  async uploadMarks(file: File, subjectId: number, semester: string, uploadedBy: string) {
+  async uploadMarks(file: File, subjectId: string, semester: string, uploadedBy: string) {
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("subjectId", subjectId.toString())
+    formData.append("subjectId", subjectId)
     formData.append("semester", semester)
     formData.append("uploadedBy", uploadedBy)
 
-    return this.request<Mark[]>("/marks/upload", {
+    return this.request<Mark[]>("/marks/upload-excel", {
       method: "POST",
       body: formData,
       headers: {}, // Remove Content-Type to let browser set it for FormData
@@ -117,7 +128,7 @@ class ApiClient {
   }
 
   async downloadMarksTemplate() {
-    const response = await fetch(`${API_BASE_URL}/marks/template`)
+    const response = await fetch(`${API_BASE_URL}/marks/download-template`)
     if (!response.ok) throw new Error("Failed to download template")
     return response.blob()
   }
@@ -133,17 +144,17 @@ class ApiClient {
     return this.request<PagedResponse<Query>>(`/queries?${searchParams}`)
   }
 
-  async getQuery(id: number) {
+  async getQuery(id: string) {
     return this.request<Query>(`/queries/${id}`)
   }
 
-  async updateQueryStatus(id: number, status: string) {
+  async updateQueryStatus(id: string, status: string) {
     return this.request<Query>(`/queries/${id}/status?status=${status}`, {
-      method: "PUT",
+      method: "PATCH",
     })
   }
 
-  async respondToQuery(id: number, response: string, respondedBy: string) {
+  async respondToQuery(id: string, response: string, respondedBy: string) {
     const params = new URLSearchParams()
     params.append("response", response)
     params.append("respondedBy", respondedBy)
@@ -161,25 +172,25 @@ class ApiClient {
     if (params.page !== undefined) searchParams.append("page", params.page.toString())
     if (params.size !== undefined) searchParams.append("size", params.size.toString())
 
-    return this.request<PagedResponse<BonafideRequest>>(`/bonafide-requests?${searchParams}`)
+    return this.request<PagedResponse<BonafideRequest>>(`/admin/bonafide-requests?${searchParams}`)
   }
 
-  async getBonafideRequest(id: number) {
-    return this.request<BonafideRequest>(`/bonafide-requests/${id}`)
+  async getBonafideRequest(id: string) {
+    return this.request<BonafideRequest>(`/admin/bonafide-requests/${id}`)
   }
 
-  async approveBonafideRequest(id: number, approvedBy: string) {
-    return this.request<BonafideRequest>(`/bonafide-requests/${id}/approve?approvedBy=${approvedBy}`, {
+  async approveBonafideRequest(id: string, adminId: string) {
+    return this.request<BonafideRequest>(`/admin/bonafide-requests/${id}/approve?adminId=${adminId}`, {
       method: "POST",
     })
   }
 
-  async rejectBonafideRequest(id: number, rejectionReason: string, rejectedBy: string) {
+  async rejectBonafideRequest(id: string, rejectionReason: string, adminId: string) {
     const params = new URLSearchParams()
-    params.append("rejectionReason", rejectionReason)
-    params.append("rejectedBy", rejectedBy)
+    params.append("adminId", adminId)
+    if (rejectionReason) params.append("remarks", rejectionReason)
 
-    return this.request<BonafideRequest>(`/bonafide-requests/${id}/reject?${params}`, {
+    return this.request<BonafideRequest>(`/admin/bonafide-requests/${id}/reject?${params}`, {
       method: "POST",
     })
   }
@@ -192,24 +203,60 @@ class ApiClient {
   async getSubjectsBySemester(semester: string) {
     return this.request<Subject[]>(`/subjects/semester/${semester}`)
   }
+
+  async createSubject(subject: CreateSubjectRequest) {
+    return this.request<Subject>("/subjects", {
+      method: "POST",
+      body: JSON.stringify(subject),
+    })
+  }
+
+  async updateSubject(id: string, subject: UpdateSubjectRequest) {
+    return this.request<Subject>(`/subjects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(subject),
+    })
+  }
+
+  async deleteSubject(id: string) {
+    return this.request<void>(`/subjects/${id}`, {
+      method: "DELETE",
+    })
+  }
+
+  async getBranches(course?: string): Promise<Branch[]> {
+    const url = course ? `/branches?course=${course}` : "/branches";
+    return this.request<Branch[]>(url);
+  }
 }
 
+export interface CourseInfo {
+  name: string;
+  totalSemesters: number;
+}
 // Types
 export interface DashboardStats {
   totalStudents: number
-  pendingQueries: number
-  bonafideRequests: number
-  resultsPublished: number
-  activeStudents: number
-  resolvedQueries: number
-  approvedBonafides: number
-  rejectedBonafides: number
+  totalProfessors: number
+  totalSubjects: number
+  totalQueriesOpen: number
+  totalBonafideRequestsPending: number
+  totalMarksRecords: number
+  // Legacy fields for backward compatibility
+  pendingQueries?: number
+  bonafideRequests?: number
+  resultsPublished?: number
+  activeStudents?: number
+  resolvedQueries?: number
+  approvedBonafides?: number
+  rejectedBonafides?: number
 }
 
 export interface Student {
-  id: number
-  rollNo: string
-  name: string
+  id: string
+  firstName: string;
+  lastName: string;
+  rollNumber: string;
   email: string
   semester: string
   department?: string
@@ -221,8 +268,9 @@ export interface Student {
 }
 
 export interface CreateStudentRequest {
-  rollNo: string
-  name: string
+  firstName: string;
+  lastName: string;
+  rollNumber: string;
   email: string
   semester: string
   department?: string
@@ -231,12 +279,22 @@ export interface CreateStudentRequest {
   active?: boolean
 }
 
-export interface UpdateStudentRequest extends CreateStudentRequest {}
+export interface UpdateStudentRequest {
+  firstName?: string;
+  lastName?: string;
+  rollNumber?: string;
+  email?: string
+  semester?: string
+  department?: string
+  phoneNumber?: string
+  address?: string
+  active?: boolean
+}
 
 export interface Mark {
-  id: number
-  studentId: number
-  subjectId: number
+  id: string
+  studentId: string
+  subjectId: string
   marks: number
   grade: string
   examType: string
@@ -251,24 +309,28 @@ export interface Mark {
 }
 
 export interface CreateMarkRequest {
-  studentId: number
-  subjectId: number
-  marks: number
+  studentId: string
+  subjectId: string
+  internal1: number
+  internal2: number
+  external: number
   examType?: string
   academicYear?: string
   uploadedBy?: string
 }
 
 export interface UpdateMarkRequest {
-  marks: number
+  internal1?: number
+  internal2?: number
+  external?: number
   examType?: string
   academicYear?: string
   uploadedBy?: string
 }
 
 export interface Query {
-  id: number
-  studentId: number
+  id: string
+  studentId: string
   subject: string
   faculty: string
   title: string
@@ -287,8 +349,8 @@ export interface Query {
 }
 
 export interface BonafideRequest {
-  id: number
-  studentId: number
+  id: string
+  studentId: string
   purpose: string
   customPurpose?: string
   additionalInfo?: string
@@ -307,7 +369,7 @@ export interface BonafideRequest {
 }
 
 export interface Subject {
-  id: number
+  id: string
   code: string
   name: string
   semester?: string
@@ -315,6 +377,17 @@ export interface Subject {
   credits?: number
   active: boolean
 }
+
+export interface CreateSubjectRequest {
+  code: string
+  name: string
+  semester?: string
+  department?: string
+  credits?: number
+  active?: boolean
+}
+
+export interface UpdateSubjectRequest extends CreateSubjectRequest {}
 
 export interface PagedResponse<T> {
   content: T[]
@@ -329,7 +402,8 @@ export interface PagedResponse<T> {
 export interface StudentFilters {
   search?: string
   semester?: string
-  department?: string
+  course?: string;
+  branch?: string;
   page?: number
   size?: number
 }
@@ -355,5 +429,7 @@ export interface BonafideFilters {
   page?: number
   size?: number
 }
+
+export type Branch = string;
 
 export const apiClient = new ApiClient()

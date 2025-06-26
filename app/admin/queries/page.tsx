@@ -31,7 +31,7 @@ export default function QueriesPage() {
   const queries = queriesData?.content || []
   const totalElements = queriesData?.totalElements || 0
 
-  const handleStatusChange = async (queryId: number, newStatus: string) => {
+  const handleStatusChange = async (queryId: string, newStatus: string) => {
     try {
       await apiClient.updateQueryStatus(queryId, newStatus)
       refetch()

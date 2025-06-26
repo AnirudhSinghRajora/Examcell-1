@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 export default function RoleLoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [form, setForm] = useState({ usernameOrEmail: "", password: "" });
-  const [role, setRole] = useState<"TEACHER" | "ADMIN">("TEACHER");
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [role, setRole] = useState<"PROFESSOR" | "ADMIN">("PROFESSOR");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +20,7 @@ export default function RoleLoginPage() {
   };
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setRole(e.target.value as "TEACHER" | "ADMIN");
+    setRole(e.target.value as "PROFESSOR" | "ADMIN");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,8 +34,11 @@ export default function RoleLoginPage() {
         setLoading(false);
         return;
       }
+      
+      // Pass the backend response directly to login function
       login(res);
-      if (res.role === "TEACHER") router.push("/teacher/dashboard");
+      
+      if (res.role === "PROFESSOR") router.push("/teacher/dashboard");
       else if (res.role === "ADMIN") router.push("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -50,10 +53,10 @@ export default function RoleLoginPage() {
         <h1 className="text-2xl font-bold text-center mb-4">Teacher/Admin Login</h1>
         {error && <div className="text-red-600 text-sm text-center">{error}</div>}
         <select value={role} onChange={handleRoleChange} className="w-full border rounded px-3 py-2 mb-2">
-          <option value="TEACHER">Teacher</option>
+          <option value="PROFESSOR">Teacher</option>
           <option value="ADMIN">Admin</option>
         </select>
-        <Input name="usernameOrEmail" placeholder="Username or Email" value={form.usernameOrEmail} onChange={handleChange} required />
+        <Input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} required />
         <Input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} required />
         <Button type="submit" className="w-full" disabled={loading}>{loading ? "Logging in..." : "Login"}</Button>
       </form>

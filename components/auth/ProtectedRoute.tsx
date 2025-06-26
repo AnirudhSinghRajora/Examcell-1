@@ -7,7 +7,7 @@ import { useEffect, ReactNode } from 'react';
 // Optional: Define props to allow role-based access
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: Array<"STUDENT" | "TEACHER" | "ADMIN">;
+  allowedRoles?: Array<"STUDENT" | "TEACHER" | "PROFESSOR" | "ADMIN">;
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {

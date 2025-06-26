@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Download, FileText, Clock, CheckCircle } from "lucide-react"
 import { studentApiClient, type BonafideRequest, type SubmitBonafideRequest } from "@/lib/student-api"
+import { useAuth } from "@/context/AuthContext"
 
 export default function BonafidePage() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<SubmitBonafideRequest>({
     purpose: "",
     customPurpose: "",
@@ -25,12 +27,16 @@ export default function BonafidePage() {
 
   useEffect(() => {
     const fetchCertificates = async () => {
+      if (!user?.studentId) {
+        console.log("No studentId found in user:", user);
+        return;
+      }
+      
       setLoading(true)
       try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}")
-        const studentId = user.studentId || 1
-
-        const response = await studentApiClient.getBonafideRequests(studentId)
+        console.log("Fetching bonafide requests for studentId:", user.studentId);
+        const response = await studentApiClient.getBonafideRequests(user.studentId)
+        console.log("Bonafide response:", response);
         setCertificates(response.content)
       } catch (error) {
         console.error("Failed to fetch certificates:", error)
@@ -40,23 +46,25 @@ export default function BonafidePage() {
     }
 
     fetchCertificates()
-  }, [])
+  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user?.studentId) {
+      alert("User not authenticated");
+      return;
+    }
+    
     setIsSubmitting(true)
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const studentId = user.studentId || 1
-
-      await studentApiClient.submitBonafideRequest(studentId, formData)
+      await studentApiClient.submitBonafideRequest(user.studentId, formData)
       alert("Bonafide certificate request submitted successfully!")
 
       setFormData({ purpose: "", customPurpose: "", additionalInfo: "" })
 
       // Refresh certificates list
-      const response = await studentApiClient.getBonafideRequests(studentId)
+      const response = await studentApiClient.getBonafideRequests(user.studentId)
       setCertificates(response.content)
     } catch (error) {
       console.error("Failed to submit request:", error)
@@ -66,7 +74,7 @@ export default function BonafidePage() {
     }
   }
 
-  const handleDownload = (certificateId: number) => {
+  const handleDownload = (certificateId: string) => {
     alert(`Downloading certificate ${certificateId}...`)
   }
 
@@ -151,9 +159,9 @@ export default function BonafidePage() {
                   <div className="flex items-center gap-4">
                     <FileText className="h-8 w-8 text-blue-600" />
                     <div>
-                      <h4 className="font-medium">{cert.purpose === "Other" ? cert.customPurpose : cert.purpose}</h4>
+                      <h4 className="font-medium">{cert.reason}</h4>
                       <p className="text-sm text-gray-600">
-                        Requested: {new Date(cert.createdAt).toLocaleDateString()}
+                        Requested: {new Date(cert.requestedAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -168,7 +176,7 @@ export default function BonafidePage() {
                     </Badge>
 
                     {cert.status === "APPROVED" && (
-                      <Button size="sm" onClick={() => handleDownload(cert.id)}>
+                      <Button size="sm" onClick={() => handleDownload(cert.id.toString())}>
                         <Download className="h-4 w-4 mr-2" />
                         Download
                       </Button>

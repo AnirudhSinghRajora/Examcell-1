@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Download, Printer, Search } from "lucide-react"
 import { studentApiClient, type StudentResult } from "@/lib/student-api"
+import { useAuth } from "@/context/AuthContext"
 
 interface SemesterResult {
   semester: string
@@ -17,6 +18,7 @@ interface SemesterResult {
 }
 
 export default function ResultsPage() {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSemester, setSelectedSemester] = useState("all")
   const [results, setResults] = useState<SemesterResult[]>([])
@@ -24,15 +26,21 @@ export default function ResultsPage() {
 
   useEffect(() => {
     const fetchResults = async () => {
+      if (!user?.studentId) {
+        console.log("No studentId found in user:", user);
+        return;
+      }
+      
       setLoading(true)
       try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}")
-        const studentId = user.studentId || 1
-
-        const studentResults = await studentApiClient.getStudentResults(studentId)
+        console.log("Fetching results for studentId:", user.studentId);
+        const studentResults = await studentApiClient.getStudentResults(user.studentId)
+        console.log("Results response:", studentResults);
+        console.log("First result details:", studentResults[0]);
 
         // Group results by semester
         const groupedResults = groupResultsBySemester(studentResults)
+        console.log("Grouped results:", groupedResults);
         setResults(groupedResults)
       } catch (error) {
         console.error("Failed to fetch results:", error)
@@ -42,12 +50,12 @@ export default function ResultsPage() {
     }
 
     fetchResults()
-  }, [])
+  }, [user])
 
   const groupResultsBySemester = (results: StudentResult[]): SemesterResult[] => {
     const grouped = results.reduce(
       (acc, result) => {
-        const semester = result.academicYear || "Current Semester"
+        const semester = `Semester ${result.semester}` || "Current Semester"
         if (!acc[semester]) {
           acc[semester] = []
         }
@@ -63,7 +71,7 @@ export default function ResultsPage() {
         semester,
         subjects: typedSubjects,
         sgpa: calculateSGPA(typedSubjects),
-        totalCredits: typedSubjects.length * 4, // Assuming 4 credits per subject
+        totalCredits: typedSubjects.reduce((sum, subject) => sum + subject.subject.credits, 0),
       };
     })
   }
@@ -72,33 +80,19 @@ export default function ResultsPage() {
     if (subjects.length === 0) return 0
 
     const totalGradePoints = subjects.reduce((sum, subject) => {
-      const gradePoints = getGradePoints(subject.grade)
-      return sum + gradePoints * 4 // Assuming 4 credits per subject
+      const gradePoint = subject.gradePoint || 0;
+      return sum + gradePoint * subject.subject.credits
     }, 0)
 
-    const totalCredits = subjects.length * 4
-    return Math.round((totalGradePoints / totalCredits) * 100) / 100
+    const totalCredits = subjects.reduce((sum, subject) => sum + subject.subject.credits, 0)
+    const sgpa = totalCredits > 0 ? totalGradePoints / totalCredits : 0;
+    
+    // Round to nearest 0.05
+    return Math.round(sgpa * 20) / 20;
   }
 
-  const getGradePoints = (grade: string): number => {
-    switch (grade) {
-      case "A+":
-        return 10
-      case "A":
-        return 9
-      case "B+":
-        return 8
-      case "B":
-        return 7
-      case "C+":
-        return 6
-      case "C":
-        return 5
-      case "D":
-        return 4
-      default:
-        return 0
-    }
+  const formatMarks = (marks: number): string => {
+    return marks.toFixed(2);
   }
 
   const filteredResults = results.filter((result) => {
@@ -108,8 +102,8 @@ export default function ResultsPage() {
     if (searchTerm) {
       return result.subjects.some(
         (subject) =>
-          subject.subjectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          subject.subjectCode.toLowerCase().includes(searchTerm.toLowerCase()),
+          subject.subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          subject.subject.code.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
     return true
@@ -217,15 +211,15 @@ export default function ResultsPage() {
                     <tbody>
                       {semester.subjects.map((subject, subIndex) => (
                         <tr key={subIndex} className="border-b">
-                          <td className="py-3 font-mono text-sm">{subject.subjectCode}</td>
-                          <td className="py-3">{subject.subjectName}</td>
-                          <td className="py-3 text-center font-semibold">{subject.marks}</td>
+                          <td className="py-3 font-mono text-sm">{subject.subject.code}</td>
+                          <td className="py-3">{subject.subject.name}</td>
+                          <td className="py-3 text-center font-semibold">{formatMarks(subject.marksObtained)}/{subject.maxMarks || 100}</td>
                           <td className="py-3 text-center">
-                            <Badge variant={subject.grade.includes("A") ? "default" : "secondary"}>
-                              {subject.grade}
+                            <Badge variant={subject.grade && subject.grade.includes("A") ? "default" : "secondary"}>
+                              {subject.grade || "N/A"}
                             </Badge>
                           </td>
-                          <td className="py-3 text-center text-sm text-gray-600">{subject.examType}</td>
+                          <td className="py-3 text-center text-sm text-gray-600">Final</td>
                         </tr>
                       ))}
                     </tbody>

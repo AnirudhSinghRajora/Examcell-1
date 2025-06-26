@@ -7,12 +7,12 @@ import { useRouter } from 'next/navigation';
 import { AuthResponse } from '@/lib/auth-api-client'; // Import the AuthResponse type
 
 interface User {
-  userId: number;
-  studentId?: number;
-  teacherId?: number;
+  userId: string; // Changed to string to match backend UUID
+  studentId?: string; // Changed to string to match backend UUID
+  teacherId?: string; // Changed to string to match backend UUID
   fullName: string;
   email: string;
-  role: "STUDENT" | "TEACHER" | "ADMIN";
+  role: "STUDENT" | "PROFESSOR" | "ADMIN"; // Changed TEACHER to PROFESSOR to match backend
 }
 
 interface AuthContextType {
@@ -50,10 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // --- ADD THIS LOGIN FUNCTION ---
   const login = (authData: AuthResponse) => {
     const userData: User = {
-      userId: authData.userId,
-      studentId: authData.studentId,
-      teacherId: authData.teacherId,
-      fullName: authData.fullName,
+      userId: authData.id,
+      // For students, use the user ID as studentId
+      studentId: authData.role === "STUDENT" ? authData.id : undefined,
+      // For professors, use the user ID as teacherId
+      teacherId: authData.role === "PROFESSOR" ? authData.id : undefined,
+      fullName: `${authData.firstName} ${authData.lastName}`,
       email: authData.email,
       role: authData.role
     };

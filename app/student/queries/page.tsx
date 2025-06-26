@@ -20,14 +20,13 @@ import {
 } from "@/components/ui/dialog"
 import { Plus, Eye, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import { studentApiClient, type StudentQuery, type StudentSubject, type SubmitQueryRequest } from "@/lib/student-api"
+import { useAuth } from "@/context/AuthContext"
 
 export default function QueriesPage() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<SubmitQueryRequest>({
     subject: "",
-    faculty: "",
-    title: "",
-    description: "",
-    priority: "MEDIUM",
+    queryText: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedQuery, setSelectedQuery] = useState<StudentQuery | null>(null)
@@ -38,16 +37,21 @@ export default function QueriesPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user?.studentId) {
+        console.log("No studentId found in user:", user);
+        return;
+      }
+      
       setLoading(true)
       try {
-        const user = JSON.parse(localStorage.getItem("user") || "{}")
-        const studentId = user.studentId || 1
-
+        console.log("Fetching queries and subjects for studentId:", user.studentId);
         const [queriesResponse, subjectsResponse] = await Promise.all([
-          studentApiClient.getStudentQueries(studentId),
-          studentApiClient.getSubjects(),
+          studentApiClient.getStudentQueries(user.studentId),
+          studentApiClient.getSubjects(user.studentId),
         ])
 
+        console.log("Queries response:", queriesResponse);
+        console.log("Subjects response:", subjectsResponse);
         setQueries(queriesResponse.content)
         setSubjects(subjectsResponse)
       } catch (error) {
@@ -58,30 +62,29 @@ export default function QueriesPage() {
     }
 
     fetchData()
-  }, [])
+  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user?.studentId) {
+      alert("User not authenticated");
+      return;
+    }
+    
     setIsSubmitting(true)
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const studentId = user.studentId || 1
-
-      await studentApiClient.submitQuery(studentId, formData)
+      await studentApiClient.submitQuery(user.studentId, formData)
       alert("Query submitted successfully!")
 
       setFormData({
         subject: "",
-        faculty: "",
-        title: "",
-        description: "",
-        priority: "MEDIUM",
+        queryText: "",
       })
       setShowDialog(false)
 
       // Refresh queries list
-      const response = await studentApiClient.getStudentQueries(studentId)
+      const response = await studentApiClient.getStudentQueries(user.studentId)
       setQueries(response.content)
     } catch (error) {
       console.error("Failed to submit query:", error)
@@ -95,8 +98,10 @@ export default function QueriesPage() {
     switch (status) {
       case "RESOLVED":
         return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "IN_PROGRESS":
-        return <AlertCircle className="h-4 w-4 text-yellow-600" />
+      case "OPEN":
+        return <Clock className="h-4 w-4 text-yellow-600" />
+      case "CLOSED":
+        return <AlertCircle className="h-4 w-4 text-gray-600" />
       default:
         return <Clock className="h-4 w-4 text-gray-600" />
     }
@@ -106,8 +111,10 @@ export default function QueriesPage() {
     switch (status) {
       case "RESOLVED":
         return "bg-green-100 text-green-800"
-      case "IN_PROGRESS":
+      case "OPEN":
         return "bg-yellow-100 text-yellow-800"
+      case "CLOSED":
+        return "bg-gray-100 text-gray-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -146,7 +153,6 @@ export default function QueriesPage() {
                     setFormData({
                       ...formData,
                       subject: value,
-                      faculty: subject?.faculty || "",
                     })
                   }}
                 >
@@ -161,54 +167,24 @@ export default function QueriesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedSubject && <p className="text-sm text-gray-600">Faculty: {selectedSubject.faculty}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="title">Query Title</Label>
-                <Input
-                  id="title"
-                  placeholder="Brief description of your query"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Detailed Description</Label>
+                <Label htmlFor="queryText">Detailed Description</Label>
                 <Textarea
-                  id="description"
+                  id="queryText"
                   placeholder="Provide detailed information about your query..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  value={formData.queryText}
+                  onChange={(e) => setFormData({ ...formData, queryText: e.target.value })}
                   rows={4}
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) => setFormData({ ...formData, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LOW">Low</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="URGENT">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isSubmitting || !formData.subject || !formData.title || !formData.description}
+                disabled={isSubmitting || !formData.subject || !formData.queryText}
               >
                 {isSubmitting ? "Submitting..." : "Submit Query"}
               </Button>
@@ -234,9 +210,9 @@ export default function QueriesPage() {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{query.title}</CardTitle>
+                    <CardTitle className="text-lg">{query.subject}</CardTitle>
                     <CardDescription>
-                      {query.subject} • Faculty: {query.faculty} • {new Date(query.createdAt).toLocaleDateString()}
+                      {new Date(query.createdAt).toLocaleDateString()}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -253,20 +229,19 @@ export default function QueriesPage() {
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl">
                         <DialogHeader>
-                          <DialogTitle>{selectedQuery?.title}</DialogTitle>
+                          <DialogTitle>{selectedQuery?.subject}</DialogTitle>
                           <DialogDescription>Query Details</DialogDescription>
                         </DialogHeader>
                         {selectedQuery && (
                           <div className="space-y-4">
                             <div>
-                              <Label className="text-sm font-medium">Subject & Faculty</Label>
+                              <Label className="text-sm font-medium">Subject</Label>
                               <p className="text-sm text-gray-700">{selectedQuery.subject}</p>
-                              <p className="text-sm text-gray-500">{selectedQuery.faculty}</p>
                             </div>
                             <div>
-                              <Label className="text-sm font-medium">Description</Label>
+                              <Label className="text-sm font-medium">Query</Label>
                               <div className="mt-2 p-4 bg-gray-50 rounded-lg">
-                                <p className="text-gray-700">{selectedQuery.description}</p>
+                                <p className="text-gray-700">{selectedQuery.queryText}</p>
                               </div>
                             </div>
                             {selectedQuery.response && (
@@ -274,12 +249,6 @@ export default function QueriesPage() {
                                 <Label className="text-sm font-medium">Response</Label>
                                 <div className="mt-2 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
                                   <p className="text-gray-700">{selectedQuery.response}</p>
-                                  {selectedQuery.respondedBy && selectedQuery.respondedAt && (
-                                    <p className="text-xs text-gray-500 mt-2">
-                                      Responded by {selectedQuery.respondedBy} on{" "}
-                                      {new Date(selectedQuery.respondedAt).toLocaleDateString()}
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             )}
@@ -291,7 +260,7 @@ export default function QueriesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 line-clamp-2">{query.description}</p>
+                <p className="text-gray-700 line-clamp-2">{query.queryText}</p>
               </CardContent>
             </Card>
           ))}

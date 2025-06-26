@@ -4,8 +4,8 @@ class TeacherApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`
 
-    // Retrieve token from localStorage or another secure place
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : undefined
+    // Retrieve token from localStorage (authToken key used by AuthContext)
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : undefined
     const config: RequestInit = {
       headers: {
         "Content-Type": "application/json",
@@ -15,15 +15,22 @@ class TeacherApiClient {
       ...options,
     }
 
+    console.log("Request config:", { url, headers: config.headers });
+
     try {
       const response = await fetch(url, config)
 
+      console.log("Response status:", response.status, response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        console.error("Response error data:", errorData);
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
-      return await response.json()
+      const data = await response.json();
+      console.log("Response data:", data);
+      return data;
     } catch (error) {
       console.error("API request failed:", error)
       throw error
@@ -31,18 +38,18 @@ class TeacherApiClient {
   }
 
   // Teacher Dashboard
-  async getTeacherDashboard(teacherId: number) {
+  async getTeacherDashboard(teacherId: string) {
     return this.request<TeacherDashboard>(`/teacher/dashboard/${teacherId}`)
   }
 
   // Teacher Queries
-  async getTeacherQueries(teacherId: number, status?: string, page = 0, size = 10) {
+  async getTeacherQueries(teacherId: string, status?: string, page = 0, size = 10) {
     const params = new URLSearchParams({ page: page.toString(), size: size.toString() })
     if (status) params.append("status", status)
     return this.request<PagedResponse<TeacherQuery>>(`/teacher/${teacherId}/queries?${params}`)
   }
 
-  async respondToQuery(teacherId: number, queryId: number, response: string) {
+  async respondToQuery(teacherId: string, queryId: string, response: string) {
     return this.request<TeacherQuery>(
       `/teacher/${teacherId}/queries/${queryId}/respond?response=${encodeURIComponent(response)}`,
       {
@@ -51,7 +58,7 @@ class TeacherApiClient {
     )
   }
 
-  async submitQueryToAdmin(teacherId: number, query: SubmitQueryRequest) {
+  async submitQueryToAdmin(teacherId: string, query: SubmitQueryRequest) {
     return this.request<TeacherQuery>(`/teacher/${teacherId}/queries/admin`, {
       method: "POST",
       body: JSON.stringify(query),
@@ -59,34 +66,38 @@ class TeacherApiClient {
   }
 
   // Marks Management
-  async getSubjectMarks(teacherId: number, subjectId: number) {
+  async getSubjectMarks(teacherId: string, subjectId: string) {
     return this.request<TeacherMark[]>(`/teacher/${teacherId}/subjects/${subjectId}/marks`)
   }
 
-  async createMark(teacherId: number, mark: CreateMarkRequest) {
+  async getStudentsForSubject(subjectId: string) {
+    return this.request<StudentDto[]>(`/subjects/${subjectId}/students`)
+  }
+
+  async createMark(teacherId: string, mark: CreateMarkRequest) {
     return this.request<TeacherMark>(`/teacher/${teacherId}/marks`, {
       method: "POST",
       body: JSON.stringify(mark),
     })
   }
 
-  async updateMark(teacherId: number, markId: number, mark: UpdateMarkRequest) {
+  async updateMark(teacherId: string, markId: string, mark: UpdateMarkRequest) {
     return this.request<TeacherMark>(`/teacher/${teacherId}/marks/${markId}`, {
       method: "PUT",
       body: JSON.stringify(mark),
     })
   }
 
-  async deleteMark(teacherId: number, markId: number) {
+  async deleteMark(teacherId: string, markId: string) {
     return this.request<void>(`/teacher/${teacherId}/marks/${markId}`, {
       method: "DELETE",
     })
   }
 
-  async uploadMarks(teacherId: number, file: File, subjectId: number, semester: string) {
+  async uploadMarks(teacherId: string, file: File, subjectId: string, semester: string) {
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("subjectId", subjectId.toString())
+    formData.append("subjectId", subjectId)
     formData.append("semester", semester)
 
     return this.request<TeacherMark[]>(`/teacher/${teacherId}/marks/upload`, {
@@ -100,7 +111,7 @@ class TeacherApiClient {
 // Types
 export interface TeacherDashboard {
   teacher: {
-    id: number
+    id: string
     employeeId: string
     name: string
     email: string
@@ -117,8 +128,8 @@ export interface TeacherDashboard {
 }
 
 export interface TeacherQuery {
-  id: number
-  studentId: number
+  id: string
+  studentId: string
   subject: string
   faculty: string
   title: string
@@ -136,10 +147,12 @@ export interface TeacherQuery {
 }
 
 export interface TeacherMark {
-  id: number
-  studentId: number
-  subjectId: number
-  marks: number
+  id: string
+  studentId: string
+  subjectId: string
+  internal1: number
+  internal2: number
+  external: number
   grade: string
   examType: string
   academicYear: string
@@ -153,7 +166,7 @@ export interface TeacherMark {
 }
 
 export interface TeacherSubject {
-  id: number
+  id: string
   code: string
   name: string
   semester: string
@@ -171,17 +184,32 @@ export interface SubmitQueryRequest {
 }
 
 export interface CreateMarkRequest {
-  studentId: number
-  subjectId: number
-  marks: number
+  studentId: string
+  subjectId: string
+  internal1: number
+  internal2: number
+  external: number
   examType?: string
   academicYear?: string
 }
 
 export interface UpdateMarkRequest {
-  marks: number
+  internal1: number
+  internal2: number
+  external: number
   examType?: string
   academicYear?: string
+}
+
+export interface StudentDto {
+  id: string
+  rollNumber: string
+  firstName: string
+  lastName: string
+  email: string
+  course: string
+  branch: string
+  batchYear: number
 }
 
 export interface PagedResponse<T> {

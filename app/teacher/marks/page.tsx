@@ -25,15 +25,19 @@ import {
   type TeacherSubject,
   type CreateMarkRequest,
   type UpdateMarkRequest,
+  type StudentDto,
 } from "@/lib/teacher-api"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/context/AuthContext"
 
 export default function TeacherMarksPage() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const [subjects, setSubjects] = useState<TeacherSubject[]>([])
   const [marks, setMarks] = useState<TeacherMark[]>([])
+  const [students, setStudents] = useState<StudentDto[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSubject, setSelectedSubject] = useState<TeacherSubject | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -43,12 +47,13 @@ export default function TeacherMarksPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
 
   // Form state for add/edit mark
-  const [formData, setFormData] = useState<CreateMarkRequest>({
-    studentId: 0,
-    subjectId: 0,
-    marks: 0,
-    examType: "Regular",
-    academicYear: "2024-25",
+  const [formData, setFormData] = useState({
+    studentId: "",
+    subjectId: selectedSubject?.id || "",
+    internal1: 0,
+    internal2: 0,
+    external: 0,
+    academicYear: "",
   })
 
   useEffect(() => {
@@ -58,24 +63,24 @@ export default function TeacherMarksPage() {
   useEffect(() => {
     const subjectId = searchParams.get("subject")
     if (subjectId && subjects.length > 0) {
-      const subject = subjects.find((s) => s.id === Number.parseInt(subjectId))
+      const subject = subjects.find((s) => s.id === subjectId)
       if (subject) {
         setSelectedSubject(subject)
         fetchMarks(subject.id)
+        fetchStudents(subject.id)
       }
     } else if (subjects.length > 0 && !selectedSubject) {
       setSelectedSubject(subjects[0])
       fetchMarks(subjects[0].id)
+      fetchStudents(subjects[0].id)
     }
   }, [subjects, searchParams])
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
-      const dashboard = await teacherApiClient.getTeacherDashboard(teacherId)
+      if (!user?.teacherId) throw new Error("No teacherId")
+      const dashboard = await teacherApiClient.getTeacherDashboard(user.teacherId)
       setSubjects(dashboard.assignedSubjects)
     } catch (error) {
       toast({
@@ -88,12 +93,10 @@ export default function TeacherMarksPage() {
     }
   }
 
-  const fetchMarks = async (subjectId: number) => {
+  const fetchMarks = async (subjectId: string) => {
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
-      const marksData = await teacherApiClient.getSubjectMarks(teacherId, subjectId)
+      if (!user?.teacherId) throw new Error("No teacherId")
+      const marksData = await teacherApiClient.getSubjectMarks(user.teacherId, subjectId)
       setMarks(marksData)
     } catch (error) {
       toast({
@@ -104,20 +107,36 @@ export default function TeacherMarksPage() {
     }
   }
 
+  const fetchStudents = async (subjectId: string) => {
+    try {
+      const studentsData = await teacherApiClient.getStudentsForSubject(subjectId)
+      setStudents(studentsData)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load students",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSubjectChange = (subjectId: string) => {
-    const subject = subjects.find((s) => s.id === Number.parseInt(subjectId))
+    const subject = subjects.find((s) => s.id === subjectId)
     if (subject) {
       setSelectedSubject(subject)
       fetchMarks(subject.id)
+      fetchStudents(subject.id)
     }
   }
 
   const handleAddMark = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
-      await teacherApiClient.createMark(teacherId, formData)
+      if (!user?.teacherId) throw new Error("No teacherId")
+      const markData = {
+        ...formData,
+        subjectId: selectedSubject?.id || "",
+      }
+      await teacherApiClient.createMark(user.teacherId, markData)
 
       toast({
         title: "Success",
@@ -142,16 +161,15 @@ export default function TeacherMarksPage() {
     if (!editingMark) return
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
+      if (!user?.teacherId) throw new Error("No teacherId")
       const updateData: UpdateMarkRequest = {
-        marks: formData.marks,
-        examType: formData.examType,
+        internal1: formData.internal1,
+        internal2: formData.internal2,
+        external: formData.external,
         academicYear: formData.academicYear,
       }
 
-      await teacherApiClient.updateMark(teacherId, editingMark.id, updateData)
+      await teacherApiClient.updateMark(user.teacherId, editingMark.id, updateData)
 
       toast({
         title: "Success",
@@ -173,14 +191,12 @@ export default function TeacherMarksPage() {
     }
   }
 
-  const handleDeleteMark = async (markId: number) => {
+  const handleDeleteMark = async (markId: string) => {
     if (!confirm("Are you sure you want to delete this mark?")) return
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
-      await teacherApiClient.deleteMark(teacherId, markId)
+      if (!user?.teacherId) throw new Error("No teacherId")
+      await teacherApiClient.deleteMark(user.teacherId, markId)
 
       toast({
         title: "Success",
@@ -203,10 +219,8 @@ export default function TeacherMarksPage() {
     if (!uploadFile || !selectedSubject) return
 
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}")
-      const teacherId = user.teacherId || user.id || 1
-
-      await teacherApiClient.uploadMarks(teacherId, uploadFile, selectedSubject.id, selectedSubject.semester)
+      if (!user?.teacherId) throw new Error("No teacherId")
+      await teacherApiClient.uploadMarks(user.teacherId, uploadFile, selectedSubject.id, selectedSubject.semester)
 
       toast({
         title: "Success",
@@ -226,11 +240,12 @@ export default function TeacherMarksPage() {
 
   const resetForm = () => {
     setFormData({
-      studentId: 0,
-      subjectId: selectedSubject?.id || 0,
-      marks: 0,
-      examType: "Regular",
-      academicYear: "2024-25",
+      studentId: "",
+      subjectId: selectedSubject?.id || "",
+      internal1: 0,
+      internal2: 0,
+      external: 0,
+      academicYear: "",
     })
   }
 
@@ -239,8 +254,9 @@ export default function TeacherMarksPage() {
     setFormData({
       studentId: mark.studentId,
       subjectId: mark.subjectId,
-      marks: mark.marks,
-      examType: mark.examType,
+      internal1: mark.internal1,
+      internal2: mark.internal2,
+      external: mark.external,
       academicYear: mark.academicYear,
     })
     setIsEditDialogOpen(true)
@@ -320,50 +336,65 @@ export default function TeacherMarksPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="studentId">Student ID</Label>
-                  <Input
-                    id="studentId"
-                    type="number"
-                    value={formData.studentId}
-                    onChange={(e) => setFormData({ ...formData, studentId: Number.parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="marks">Marks</Label>
-                  <Input
-                    id="marks"
-                    type="number"
-                    max="100"
-                    value={formData.marks}
-                    onChange={(e) => setFormData({ ...formData, marks: Number.parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="examType">Exam Type</Label>
+                  <Label htmlFor="studentId">Student</Label>
                   <Select
-                    value={formData.examType}
-                    onValueChange={(value) => setFormData({ ...formData, examType: value })}
+                    value={formData.studentId}
+                    onValueChange={(value) => setFormData({ ...formData, studentId: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select exam type" />
+                      <SelectValue placeholder="Select a student" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Regular">Regular</SelectItem>
-                      <SelectItem value="Supplementary">Supplementary</SelectItem>
-                      <SelectItem value="Revaluation">Revaluation</SelectItem>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.firstName} {student.lastName} ({student.rollNumber})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label htmlFor="academicYear">Academic Year</Label>
+                  <Label htmlFor="internal1">Internal 1</Label>
                   <Input
-                    id="academicYear"
-                    value={formData.academicYear}
-                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                    id="internal1"
+                    type="number"
+                    max="100"
+                    value={formData.internal1 ?? ""}
+                    onChange={e => setFormData({ ...formData, internal1: Number(e.target.value) || 0 })}
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="internal2">Internal 2</Label>
+                  <Input
+                    id="internal2"
+                    type="number"
+                    max="100"
+                    value={formData.internal2 ?? ""}
+                    onChange={e => setFormData({ ...formData, internal2: Number(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="external">External</Label>
+                  <Input
+                    id="external"
+                    type="number"
+                    max="100"
+                    value={formData.external ?? ""}
+                    onChange={e => setFormData({ ...formData, external: Number(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="examType">Exam Type</Label>
+                  <Input id="examType" value="Final" disabled />
+                </div>
+
+                <div>
+                  <Label htmlFor="academicYear">Academic Year</Label>
+                  <Input id="academicYear" value={formData.academicYear ?? ""} readOnly />
                 </div>
               </div>
               <DialogFooter>
@@ -384,13 +415,13 @@ export default function TeacherMarksPage() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 items-center">
-            <Select value={selectedSubject?.id.toString() || ""} onValueChange={handleSubjectChange}>
+            <Select value={selectedSubject?.id || ""} onValueChange={handleSubjectChange}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
                 {subjects.map((subject) => (
-                  <SelectItem key={subject.id} value={subject.id.toString()}>
+                  <SelectItem key={subject.id} value={subject.id}>
                     {subject.name} ({subject.code}) - Sem {subject.semester}
                   </SelectItem>
                 ))}
@@ -436,7 +467,9 @@ export default function TeacherMarksPage() {
                 <TableRow>
                   <TableHead>Student Name</TableHead>
                   <TableHead>Roll No</TableHead>
-                  <TableHead>Marks</TableHead>
+                  <TableHead>Internal 1</TableHead>
+                  <TableHead>Internal 2</TableHead>
+                  <TableHead>External</TableHead>
                   <TableHead>Grade</TableHead>
                   <TableHead>Exam Type</TableHead>
                   <TableHead>Academic Year</TableHead>
@@ -448,7 +481,9 @@ export default function TeacherMarksPage() {
                   <TableRow key={mark.id}>
                     <TableCell className="font-medium">{mark.studentName}</TableCell>
                     <TableCell>{mark.studentRollNo}</TableCell>
-                    <TableCell className="font-medium">{mark.marks}</TableCell>
+                    <TableCell>{mark.internal1}</TableCell>
+                    <TableCell>{mark.internal2}</TableCell>
+                    <TableCell>{mark.external}</TableCell>
                     <TableCell>
                       <Badge variant={mark.grade === "F" ? "destructive" : "default"}>{mark.grade}</Badge>
                     </TableCell>
@@ -485,38 +520,62 @@ export default function TeacherMarksPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-marks">Marks</Label>
+              <Label htmlFor="edit-studentId">Student</Label>
+              <Select
+                value={formData.studentId}
+                onValueChange={(value) => setFormData({ ...formData, studentId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a student" />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.firstName} {student.lastName} ({student.rollNumber})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-internal1">Internal 1</Label>
               <Input
-                id="edit-marks"
+                id="edit-internal1"
                 type="number"
                 max="100"
-                value={formData.marks}
-                onChange={(e) => setFormData({ ...formData, marks: Number.parseInt(e.target.value) || 0 })}
+                value={formData.internal1 ?? ""}
+                onChange={e => setFormData({ ...formData, internal1: Number(e.target.value) || 0 })}
               />
             </div>
 
             <div>
-              <Label htmlFor="edit-examType">Exam Type</Label>
-              <Select
-                value={formData.examType}
-                onValueChange={(value) => setFormData({ ...formData, examType: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select exam type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Regular">Regular</SelectItem>
-                  <SelectItem value="Supplementary">Supplementary</SelectItem>
-                  <SelectItem value="Revaluation">Revaluation</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-internal2">Internal 2</Label>
+              <Input
+                id="edit-internal2"
+                type="number"
+                max="100"
+                value={formData.internal2 ?? ""}
+                onChange={e => setFormData({ ...formData, internal2: Number(e.target.value) || 0 })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-external">External</Label>
+              <Input
+                id="edit-external"
+                type="number"
+                max="100"
+                value={formData.external ?? ""}
+                onChange={e => setFormData({ ...formData, external: Number(e.target.value) || 0 })}
+              />
             </div>
 
             <div>
               <Label htmlFor="edit-academicYear">Academic Year</Label>
               <Input
                 id="edit-academicYear"
-                value={formData.academicYear}
+                value={formData.academicYear ?? ""}
                 onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
               />
             </div>

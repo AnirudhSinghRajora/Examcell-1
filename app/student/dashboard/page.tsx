@@ -23,6 +23,7 @@ function DashboardContent() {
   useEffect(() => {
     // Only run the effect if we have a user object
     if (!user || !user.studentId) {
+      console.log("DEBUG: User or studentId missing:", { user, studentId: user?.studentId });
       return;
     }
 
@@ -31,10 +32,13 @@ function DashboardContent() {
         setLoading(true);
         // --- MODIFICATION 4: Use the reliable studentId from the auth context ---
         const studentId = user.studentId!;
+        console.log("DEBUG: Fetching dashboard for studentId:", studentId);
 
         const data = await studentApiClient.getStudentDashboard(studentId);
+        console.log("DEBUG: Dashboard data received:", data);
         setDashboardData(data);
       } catch (err) {
+        console.error("DEBUG: Dashboard fetch error:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
       } finally {
         setLoading(false);

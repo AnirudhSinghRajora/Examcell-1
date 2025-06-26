@@ -62,19 +62,17 @@ export interface SignupRequest {
 }
 
 export interface LoginRequest {
-  usernameOrEmail: string
+  email: string
   password: string
 }
 
 export interface AuthResponse {
   token: string
-  role: "STUDENT" | "TEACHER" | "ADMIN"
-  userId: number
-  studentId?: number
-  teacherId?: number
-  fullName: string
+  id: string // UUID from backend
   email: string
-  message: string
+  role: "STUDENT" | "PROFESSOR" | "ADMIN"
+  firstName: string
+  lastName: string
 }
 
 export const authApiClient = new AuthApiClient()
